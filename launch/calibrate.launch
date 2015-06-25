@@ -1,0 +1,18 @@
+<launch>
+    <!-- Launch camera driver -->
+    <include file="$(find ueye_cam)/launch/rgb8.launch" />
+    
+    <!-- Launch camera driver -->
+    <include file="$(find mocap_optitrack)/launch/mocap.launch" />
+    
+    <!-- Calibration node -->
+    <node pkg="ext_cam_calibrate" type="calibrate.py" name="calibrate" output="screen" >
+        <param name="~squareSize" value="0.06" />
+        <param name="~zOffset" value="-0.007" />
+        <param name="~numHorizCorners" value="8" />
+        <param name="~numVertCorners" value="6" />
+        <param name="~sampleBuffSize" value="10" />
+        <param name="~stationaryThreshold" value="1" />
+        <param name="~numMeasurements" value="5" />
+    </node>
+</launch>
