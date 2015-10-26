@@ -47,7 +47,7 @@ def calibration():
     sampleBuffSize = rospy.get_param("~sampleBuffSize",10)
     stationaryThreshold = rospy.get_param("~stationaryThreshold",1) # [pixels]
     numMeasurements = rospy.get_param("~numMeasurements",5)
-    camera = rospy.get_param("~camera","camera")
+    cameraName = rospy.get_param("~cameraName","camera")
     cameraTF = rospy.get_param("~cameraTF","camera")
     
     # Object for converting ROS images to OpenCV images
@@ -71,7 +71,7 @@ def calibration():
     
     # Get camera intrinsic parameters and distortion coefficients
     K = None
-    camInfoSub = rospy.Subscriber(camera+"/camera_info",CameraInfo,camInfoCB)
+    camInfoSub = rospy.Subscriber(cameraName+"/camera_info",CameraInfo,camInfoCB)
     rospy.loginfo("Waiting to get camera intrinsic parameters...")
     while (K is None) and (not rospy.is_shutdown()): # Wait until recieved camera info
         rospy.sleep(0.5)
@@ -86,7 +86,7 @@ def calibration():
     localObjPts = squareSize*np.vstack((x.flatten()+1,y.flatten()+1,np.zeros(numHorizCorners*numVertCorners)+zOffset/squareSize)).T
     
     # Subscribe to camera and mocap topics
-    image_sub = rospy.Subscriber(camera+"/image_raw",Image,imageCB)
+    image_sub = rospy.Subscriber(cameraName+"/image_raw",Image,imageCB)
     
     # Wait for shutdown, publish solution
     while not rospy.is_shutdown():

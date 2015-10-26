@@ -14,7 +14,7 @@
         <param name="~sampleBuffSize" value="10" /> <!-- number of samples per measurement. Since timestamp of image and mocap data are not synced, need to sit and wait to make sure data correlates -->
         <param name="~stationaryThreshold" value="1" /> <!-- threshold in pixel motion to consider camera as stationary and can then start taking measurements -->
         <param name="~numMeasurements" value="5" /> <!-- number of measurements to average to get final result -->
-        <param name="~camera" value="mv_BF001066" /> <!-- camera topic -->
+        <param name="~cameraName" value="mv_BF001066" /> <!-- camera topic -->
         <param name="~cameraTF" value="camera" /> <!-- tf frame name of camera mocap pose -->
     </node>
 </launch>
