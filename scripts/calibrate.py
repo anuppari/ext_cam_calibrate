@@ -34,7 +34,7 @@ def calibration():
     global bridge, tfl, tfbr, localObjPts
     global K
     global cornerBuff, data, solutionBuff, state
-    global squareSize, numHorizCorners, numVertCorners, sampleBuffSize, stationaryThreshold
+    global squareSize, numHorizCorners, numVertCorners, sampleBuffSize, stationaryThreshold, cameraTF
     
     # Init node
     rospy.init_node('calibrate')
@@ -47,6 +47,8 @@ def calibration():
     sampleBuffSize = rospy.get_param("~sampleBuffSize",10)
     stationaryThreshold = rospy.get_param("~stationaryThreshold",1) # [pixels]
     numMeasurements = rospy.get_param("~numMeasurements",5)
+    camera = rospy.get_param("~camera","camera")
+    cameraTF = rospy.get_param("~cameraTF","camera")
     
     # Object for converting ROS images to OpenCV images
     bridge = CvBridge()
@@ -69,7 +71,7 @@ def calibration():
     
     # Get camera intrinsic parameters and distortion coefficients
     K = None
-    camInfoSub = rospy.Subscriber("camera/camera_info",CameraInfo,camInfoCB)
+    camInfoSub = rospy.Subscriber(camera+"/camera_info",CameraInfo,camInfoCB)
     rospy.loginfo("Waiting to get camera intrinsic parameters...")
     while (K is None) and (not rospy.is_shutdown()): # Wait until recieved camera info
         rospy.sleep(0.5)
@@ -84,7 +86,7 @@ def calibration():
     localObjPts = squareSize*np.vstack((x.flatten()+1,y.flatten()+1,np.zeros(numHorizCorners*numVertCorners)+zOffset/squareSize)).T
     
     # Subscribe to camera and mocap topics
-    image_sub = rospy.Subscriber("camera/image_raw",Image,imageCB)
+    image_sub = rospy.Subscriber(camera+"/image_raw",Image,imageCB)
     
     # Wait for shutdown, publish solution
     while not rospy.is_shutdown():
@@ -92,7 +94,7 @@ def calibration():
             # Publish average solution
             tIm2Cam = np.mean(solutionBuff['tIm2Cam'],axis=0)
             qIm2Cam = np.mean(solutionBuff['qIm2Cam'],axis=0)
-            tfbr.sendTransform(tIm2Cam,qIm2Cam,rospy.Time.now(),"image","camera")
+            tfbr.sendTransform(tIm2Cam,qIm2Cam,rospy.Time.now(),"image",cameraTF)
             
             # Finish if enough measurements
             if (len(solutionBuff['tIm2Cam']) >= numMeasurements) and (len(solutionBuff['qIm2Cam']) >= numMeasurements):
@@ -226,8 +228,8 @@ def imageCB(imageMsg):
                 data['qBoard'].append(qBoard)
                 
                 # Get camera pose w.r.t. world, expressed in world frame. p_world = qCam*p_cam + tCam
-                tfl.waitForTransform("/world","/camera",imageTimeStamp,rospy.Duration(0.5))
-                (tCam,qCam) = tfl.lookupTransform("/world","/camera",imageTimeStamp)
+                tfl.waitForTransform("/world",cameraTF,imageTimeStamp,rospy.Duration(0.5))
+                (tCam,qCam) = tfl.lookupTransform("/world",cameraTF,imageTimeStamp)
                 data['tCam'].append(tCam)
                 data['qCam'].append(qCam)
         
@@ -306,8 +308,8 @@ def stuff():
     tfbr.sendTransform(tIm2World,qIm2World,imageTimeStamp,"image","world")
     
     # Get camera pose w.r.t. world, expressed in world frame. p_world = qCam*p_cam + tCam
-    tfl.waitForTransform("/world","/camera",imageTimeStamp,rospy.Duration(0.5))
-    (tCam,qCam) = tfl.lookupTransform("/world","/camera",imageTimeStamp)
+    tfl.waitForTransform("/world",cameraTF,imageTimeStamp,rospy.Duration(0.5))
+    (tCam,qCam) = tfl.lookupTransform("/world",cameraTF,imageTimeStamp)
     
     # Calculate image pose w.r.t. camera, expressed in camera frame. p_cam = qIm2Cam*p_image + tIm2Cam
     tIm2Cam = rotateVec(tIm2World-tCam,qConj(qCam))
