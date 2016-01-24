@@ -8,7 +8,7 @@
     <!-- Calibration node -->
     <node pkg="ext_cam_calibrate" type="calibrate.py" name="calibrate" output="screen" >
         <param name="~squareSize" value="0.06" /> <!-- calibration grid square size -->
-        <param name="~zOffset" value="-0.007" /> <!-- z offset between mocap marker plane and calibration pattern plane. should be negative if markers are above pattern -->
+        <param name="~zOffset" value="-0.007" /> <!-- z offset between mocap marker plane and calibration pattern plane. should be negative if mocap markers are above pattern -->
         <param name="~numHorizCorners" value="8" /> <!-- number of corners in horizontal direction -->
         <param name="~numVertCorners" value="6" /> <!-- number of corners in vertical direction -->
         <param name="~sampleBuffSize" value="10" /> <!-- number of samples per measurement. Since timestamp of image and mocap data are not synced, need to sit and wait to make sure data correlates -->
