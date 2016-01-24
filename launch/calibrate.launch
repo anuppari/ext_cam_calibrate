@@ -2,7 +2,7 @@
     <!-- Launch camera driver -->
     <include file="$(find bluefox2)/launch/single_node.launch" />
     
-    <!-- Launch camera driver -->
+    <!-- Launch motion capture driver -->
     <include file="$(find mocap_optitrack)/launch/mocap.launch" />
     
     <!-- Calibration node -->
