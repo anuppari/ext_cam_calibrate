@@ -4,10 +4,16 @@ project(ext_cam_calibrate)
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
+find_package(cmake_modules REQUIRED)
+find_package(Eigen REQUIRED)
+find_package(OpenCV REQUIRED)
 find_package(catkin REQUIRED COMPONENTS
   cv_bridge
   rospy
+  roscpp
   sensor_msgs
+  image_transport
+  image_geometry
   tf
 )
 
@@ -96,6 +102,8 @@ catkin_package(
 # include_directories(include)
 include_directories(
   ${catkin_INCLUDE_DIRS}
+  ${Eigen_INCLUDE_DIRS}
+  ${OpenCV_INCLUDE_DIRS}
 )
 
 ## Declare a cpp library
@@ -104,16 +112,17 @@ include_directories(
 # )
 
 ## Declare a cpp executable
-# add_executable(ext_cam_calibrate_node src/ext_cam_calibrate_node.cpp)
+add_executable(calibrate_node src/calibrate_node.cpp)
 
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
-# add_dependencies(ext_cam_calibrate_node ext_cam_calibrate_generate_messages_cpp)
+add_dependencies(calibrate_node ${catkin_EXPORTED_TARGETS})
 
 ## Specify libraries to link a library or executable target against
-# target_link_libraries(ext_cam_calibrate_node
-#   ${catkin_LIBRARIES}
-# )
+target_link_libraries(calibrate_node
+  ${catkin_LIBRARIES}
+  ${OpenCV_LIBRARIES}
+)
 
 #############
 ## Install ##
