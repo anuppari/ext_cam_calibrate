@@ -1,12 +1,12 @@
 <launch>
     <!-- Launch camera driver -->
-    <include file="$(find bluefox2)/launch/single_node.launch" />
+    <!-- <include file="$(find ueye_cam)/launch/rgb8.launch" /> -->
     
     <!-- Launch motion capture driver -->
-    <include file="$(find mocap_optitrack)/launch/mocap.launch" />
+    <!-- <include file="$(find mocap_optitrack)/launch/mocap.launch" /> -->
     
     <!-- Calibration node -->
-    <node pkg="ext_cam_calibrate" type="calibrate.py" name="calibrate" output="screen" >
+    <node pkg="ext_cam_calibrate" type="calibrate_node" name="calibrate" output="screen" >
         <param name="~squareSize" value="0.06" /> <!-- calibration grid square size -->
         <param name="~zOffset" value="-0.007" /> <!-- z offset between mocap marker plane and calibration pattern plane. should be negative if mocap markers are above pattern -->
         <param name="~numHorizCorners" value="8" /> <!-- number of corners in horizontal direction -->
@@ -14,7 +14,7 @@
         <param name="~sampleBuffSize" value="10" /> <!-- number of samples per measurement. Since timestamp of image and mocap data are not synced, need to sit and wait to make sure data correlates -->
         <param name="~stationaryThreshold" value="1" /> <!-- threshold in pixel motion to consider camera as stationary and can then start taking measurements -->
         <param name="~numMeasurements" value="5" /> <!-- number of measurements to average to get final result -->
-        <param name="~cameraName" value="mv_BF001066" /> <!-- camera topic -->
+        <param name="~cameraName" value="camera" /> <!-- camera topic -->
         <param name="~cameraTF" value="camera" /> <!-- tf frame name of camera mocap pose -->
     </node>
 </launch>

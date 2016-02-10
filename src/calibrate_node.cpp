@@ -4,9 +4,11 @@
 #include <image_transport/image_transport.h>
 #include <image_geometry/pinhole_camera_model.h>
 #include <sensor_msgs/Image.h>
+#include <sensor_msgs/image_encodings.h>
 #include <cv_bridge/cv_bridge.h>
 
 #include <sstream>
+#include <string>
 #include <Eigen/Dense>
 #include <Eigen/Geometry>
 #include <opencv2/core/eigen.hpp>
@@ -67,7 +69,7 @@ private:
 
 public:
     ext_cam_calibrate() : it_(nh_)
-    {
+    {        
         // Get parameters
         ros::NodeHandle nhp("~"); // "private" nodehandle, used to access private parameters
         nhp.param<double>("squareSize", squareSize_, 0.06);
@@ -96,13 +98,15 @@ public:
         tIm2CamBuff_ = Eigen::MatrixXd::Zero(numMeasurements_,3);
         qIm2CamBuff_ = Eigen::MatrixXd::Zero(numMeasurements_,4);
         
+        
+        
         // Construct chessboard 3D points container
         chessboardObjPts_ = std::vector<cv::Point3f>(numHorizCorners_*numVertCorners_,cv::Point3f());
         for (int i = 0; i < numVertCorners_; i++)
         {
             for (int j = 0; j < numHorizCorners_; j++)
             {
-                chessboardObjPts_.at(numHorizCorners_*i + j) = cv::Point3f((j+1)*squareSize_,(i+1)*squareSize_,zOffset_);
+                chessboardObjPts_.at(numHorizCorners_*i + j) = cv::Point3f((i+1)*squareSize_,(j+1)*squareSize_,zOffset_);
             }
         }
 
@@ -120,7 +124,7 @@ public:
         image_sub_ = it_.subscribe(cameraName_+"/image_raw", 1, &ext_cam_calibrate::imageCB,this);
         
         // Create window to display image, corners, status, etc.
-        cv::namedWindow(OPENCV_WINDOW);
+        cv::namedWindow(OPENCV_WINDOW,cv::WINDOW_NORMAL);
     }
     
     ~ext_cam_calibrate()
@@ -171,7 +175,9 @@ public:
         bool patternFound = cv::findChessboardCorners(image,patternSize,corners,cv::CALIB_CB_ADAPTIVE_THRESH+cv::CALIB_CB_NORMALIZE_IMAGE+cv::CALIB_CB_FAST_CHECK);
         if (patternFound)
         {
-            cv::cornerSubPix(image,corners,cv::Size(11,11),cv::Size(-1,-1),cv::TermCriteria(CV_TERMCRIT_EPS + CV_TERMCRIT_ITER, 30, 0.1));
+            cv::Mat imageGray;
+            cv::cvtColor(image,imageGray,CV_BGR2GRAY);
+            cv::cornerSubPix(imageGray,corners,cv::Size(11,11),cv::Size(-1,-1),cv::TermCriteria(CV_TERMCRIT_EPS + CV_TERMCRIT_ITER, 30, 0.1));
         }
         
         // Calculate PnP solution, and publish on tf. Draw corners
@@ -192,10 +198,11 @@ public:
             qIm2Board = Eigen::Quaterniond(rotMat.transpose());
             Eigen::Vector3d tBoard2Im;
             cv::cv2eigen(tvec,tBoard2Im);
-            tIm2Board = -1*qIm2Board*tBoard2Im;
+            tIm2Board = -1*(qIm2Board*tBoard2Im);
             
             // Broadcast for visual verification of PnP solution
-            tfbr_.sendTransform(tf::StampedTransform(tf::Transform(tf::Quaternion(qIm2Board.x(),qIm2Board.y(),qIm2Board.z(),qIm2Board.w()),tf::Vector3(tIm2Board(0),tIm2Board(1),tIm2Board(2))),imageTimeStamp,"board","image2"));
+            tfbr_.sendTransform(tf::StampedTransform(tf::Transform(tf::Quaternion(qIm2Board.x(),qIm2Board.y(),qIm2Board.z(),qIm2Board.w()),
+                                                    tf::Vector3(tIm2Board(0),tIm2Board(1),tIm2Board(2))),imageTimeStamp,"board","image2"));
             
             // Draw corners on image
             drawChessboardCorners(image, patternSize, cv::Mat(corners), patternFound);
@@ -207,7 +214,7 @@ public:
         // Display
         cv::Mat displayImage(image.rows+infoImg.rows, image.cols, image.type());
         image.copyTo(displayImage(cv::Range(0,image.rows),cv::Range(0,image.cols)));
-        infoImg.copyTo(displayImage(cv::Range(image.rows+1,image.rows+infoImg.rows),cv::Range(0,image.cols)));
+        infoImg.copyTo(displayImage(cv::Range(image.rows,image.rows+infoImg.rows),cv::Range(0,image.cols)));
         cv::imshow(OPENCV_WINDOW,displayImage);
         int key = cv::waitKey(30); // allow time to display image and get key presses
         
@@ -221,7 +228,7 @@ public:
                     currentState_ = STATE_SAMPLING;
                     numSamplesRecorded_ = 0;
                 }
-                else if (key == 13) // enter key = finished with measurements
+                else if (key == 10) // enter key = finished with measurements
                 {
                     image_sub_.shutdown();
                     
@@ -234,15 +241,29 @@ public:
                     
                     // Print
                     std::ostringstream convert;
-                    convert << "Current Calibration:" << std::endl;
-                    convert << "  translation: " << t << std::endl;
-                    convert << "  orientation: " << q << std::endl;
+                    convert << "\nCurrent Calibration:" << std::endl;
+                    convert << "  translation: " << t.transpose() << std::endl;
+                    convert << "  orientation: " << q.transpose() << std::endl;
                     convert << "Measurement Variance:" << std::endl;
-                    convert << "  translation: " << t_var << std::endl;
-                    convert << "  orientation: " << q_var << std::endl;
+                    convert << "  translation: " << t_var.transpose() << std::endl;
+                    convert << "  orientation: " << q_var.transpose() << std::endl;
                     ROS_INFO("%s",convert.str().c_str());
                     
-                    // save to file
+                    // Print static transform publisher code
+                    convert.str(std::string());
+                    convert.clear();
+                    convert << "To track the image pose, either run the following at the command line, or add the following to your launch file:\n\n";
+                    convert << "Command line:\n";
+                    convert << "rosrun tf static_transform_publisher " << t(0) << " " << t(1) << " " << t(2) << " "
+                                                                        << q(0) << " " << q(1) << " " << q(2) << " " << q(3) << " " << cameraTF_ << " image 100\n\n";
+                    convert << "Launch File:\n";
+                    convert << "<node pkg=\"tf\" type=\"static_transform_publisher\" name=\"image_broadcaster\" args=\"" << t(0) << " " << t(1) << " " << t(2) << " "
+                                                                        << q(0) << " " << q(1) << " " << q(2) << " " << q(3) << " " << cameraTF_ << " image 100\" />\n\n";
+                    
+                    std::cout << convert.str() << std::endl;
+                    
+                    // Signal node shutdown
+                    ros::shutdown();
                 }
             }
         }
@@ -252,36 +273,42 @@ public:
             {
                 // Store calculated PnP solution in buffer
                 tIm2BoardBuff_.row(numSamplesRecorded_) = tIm2Board;
-                qIm2BoardBuff_.row(numSamplesRecorded_) << qIm2Board.w(), qIm2Board.x(), qIm2Board.y(), qIm2Board.z(); // Eigen order, w,x,y,z
+                qIm2BoardBuff_.row(numSamplesRecorded_) << qIm2Board.x(), qIm2Board.y(), qIm2Board.z(), qIm2Board.w(); // Eigen expects x,y,z,w order when converting to quaternion
                 
                 // Get calibration board pose w.r.t. world, expressed in world frame. p_world = qBoard*p_board + tBoard
                 tf::StampedTransform boardTransform;
                 tfl_.waitForTransform("/world","/board",imageTimeStamp,ros::Duration(0.1));
                 tfl_.lookupTransform("/world","/board",imageTimeStamp,boardTransform);
                 tBoardBuff_.row(numSamplesRecorded_) << boardTransform.getOrigin().getX(),boardTransform.getOrigin().getY(),boardTransform.getOrigin().getZ();
-                qBoardBuff_.row(numSamplesRecorded_) << boardTransform.getRotation().getW(), boardTransform.getRotation().getX(), boardTransform.getRotation().getY(), boardTransform.getRotation().getZ(); // Eigen order, w,x,y,z
+                qBoardBuff_.row(numSamplesRecorded_) << boardTransform.getRotation().getX(), boardTransform.getRotation().getY(), boardTransform.getRotation().getZ(), boardTransform.getRotation().getW(); // Eigen expects x,y,z,w order when converting to quaternion
                 
                 // Get camera pose w.r.t. world, expressed in world frame. p_world = qCam*p_cam + tCam
                 tf::StampedTransform camTransform;
                 tfl_.waitForTransform("/world",cameraTF_,imageTimeStamp,ros::Duration(0.1));
                 tfl_.lookupTransform("/world",cameraTF_,imageTimeStamp,camTransform);
                 tCamBuff_.row(numSamplesRecorded_) << camTransform.getOrigin().getX(),camTransform.getOrigin().getY(),camTransform.getOrigin().getZ();
-                qCamBuff_.row(numSamplesRecorded_) << camTransform.getRotation().getW(), camTransform.getRotation().getX(), camTransform.getRotation().getY(), camTransform.getRotation().getZ(); // Eigen order, w,x,y,z
+                qCamBuff_.row(numSamplesRecorded_) << camTransform.getRotation().getX(), camTransform.getRotation().getY(), camTransform.getRotation().getZ(), camTransform.getRotation().getW(); // Eigen expects x,y,z,w order when converting to quaternion
+                
+                numSamplesRecorded_++;
                 
                 if (numSamplesRecorded_ >= sampleBuffSize_)
                 {
                     // Get sample mean
                     tIm2Board = tIm2BoardBuff_.colwise().mean();
                     qIm2Board = Eigen::Quaterniond((Eigen::Vector4d) qIm2BoardBuff_.colwise().mean());
+                    qIm2Board.normalize();
                     Eigen::Vector3d tBoard = tBoardBuff_.colwise().mean();
                     Eigen::Quaterniond qBoard((Eigen::Vector4d) qBoardBuff_.colwise().mean());
+                    qBoard.normalize();
                     Eigen::Vector3d tCam = tCamBuff_.colwise().mean();
                     Eigen::Quaterniond qCam((Eigen::Vector4d) qCamBuff_.colwise().mean());
+                    qCam.normalize();
                     
                     // Calculate image pose w.r.t. world, expressed in world frame. p_world = qIm2World*p_image + tIm2World
                     Eigen::Vector3d tIm2World = tBoard + qBoard*tIm2Board;
                     Eigen::Quaterniond qIm2World = qBoard*qIm2Board;
-                    tfbr_.sendTransform(tf::StampedTransform(tf::Transform(tf::Quaternion(qIm2World.x(),qIm2World.y(),qIm2World.z(),qIm2World.w()),tf::Vector3(tIm2World(0),tIm2World(1),tIm2World(2))),imageTimeStamp,"board","image"));
+                    tfbr_.sendTransform(tf::StampedTransform(tf::Transform(tf::Quaternion(qIm2World.x(),qIm2World.y(),qIm2World.z(),qIm2World.w()),
+                                                                            tf::Vector3(tIm2World(0),tIm2World(1),tIm2World(2))),imageTimeStamp,"world","image3"));
                     
                     // Calculate image pose w.r.t. camera, expressed in camera frame. p_cam = qIm2Cam*p_image + tIm2Cam
                     Eigen::Vector3d tIm2Cam = qCam.inverse()*(tIm2World-tCam);
@@ -295,8 +322,8 @@ public:
                     }
                     
                     // Add to solution buffer
-                    tIm2CamBuff_.row(numMeasurementsRecorded_) = tIm2Cam;
-                    qIm2CamBuff_.row(numMeasurementsRecorded_) << qIm2Cam.vec(), qIm2Cam.w(); // tf order, x,y,z,w
+                    tIm2CamBuff_.row(numMeasurementsRecorded_) = tIm2Cam.transpose();
+                    qIm2CamBuff_.row(numMeasurementsRecorded_) << qIm2Cam.vec().transpose(), qIm2Cam.w(); // tf order, x,y,z,w
                     
                     // Clear sample buffers
                     tIm2BoardBuff_ = Eigen::MatrixXd::Zero(sampleBuffSize_,3);
@@ -308,10 +335,7 @@ public:
                     
                     numSamplesRecorded_ = 0;
                     numMeasurementsRecorded_++;
-                }
-                else
-                {
-                    numSamplesRecorded_++;
+                    currentState_ = STATE_WAITING;
                 }
             }
         }
@@ -331,16 +355,43 @@ public:
         get_current_calibration_results(t,q,t_var,q_var);
         
         // convert to string
-        std::ostringstream convert;
-        convert << "Num. Recorded Measurements: " << numMeasurementsRecorded_ << std::endl;
-        convert << "Current Calibration:" << std::endl;
-        convert << "  translation: " << t << std::endl;
-        convert << "  orientation: " << q << std::endl;
-        convert << "Measurement Variance:" << std::endl;
-        convert << "  translation: " << t_var << std::endl;
-        convert << "  orientation: " << q_var << std::endl;
+        std::stringstream convert;
+        convert << "Num. Recorded Measurements: " << numMeasurementsRecorded_ << "\n" << std::endl;
+        convert << "Current Calibration:" << "\n" << std::endl;
+        convert << "  translation: " << t.transpose() << "\n" << std::endl;
+        convert << "  orientation: " << q.transpose() << "\n" << std::endl;
+        convert << "Measurement Variance:" << "\n" << std::endl;
+        convert << "  translation: " << t_var.transpose() << "\n" << std::endl;
+        convert << "  orientation: " << q_var.transpose() << "\n" << std::endl;
         
-        cv::putText(infoImg,convert.str(),cv::Point(5,10),cv::FONT_HERSHEY_SIMPLEX,1,cv::Scalar(0,0,0),2);
+        std::string line;
+        int i = 0;
+        while (std::getline(convert, line))
+        {
+            cv::putText(infoImg,line,cv::Point(10,25+20*i),cv::FONT_HERSHEY_SIMPLEX,1,cv::Scalar(0,0,0),2);
+            i++;
+        }
+        
+        // Instructions
+        convert.str(std::string());
+        convert.clear();
+        convert << "Space Bar: Take measurement\n" << std::endl;
+        convert << "Enter Key: Finish calibration";
+        i = 0;
+        while (std::getline(convert, line))
+        {
+            cv::putText(infoImg,line,cv::Point(1100,40+30*i),cv::FONT_HERSHEY_SIMPLEX,1.3,cv::Scalar(50,130,0),2);
+            i++;
+        }
+        
+        
+        if (currentState_ == STATE_SAMPLING)
+        {
+            convert.str(std::string());
+            convert.clear();
+            convert << "Sampling: " << numSamplesRecorded_ << "/" << sampleBuffSize_;
+            cv::putText(infoImg,convert.str(),cv::Point(1100,250),cv::FONT_HERSHEY_SIMPLEX,2.5,cv::Scalar(0,0,255),2);
+        }
         
         return infoImg;
     }
@@ -349,10 +400,14 @@ public:
     {
         if (numMeasurementsRecorded_ > 0)
         {
+            // Calculate results
             t = tIm2CamBuff_.topRows(numMeasurementsRecorded_).colwise().mean();
             q = qIm2CamBuff_.topRows(numMeasurementsRecorded_).colwise().mean();
             t_var = (tIm2CamBuff_.topRows(numMeasurementsRecorded_).rowwise() - t.transpose()).array().pow(2).colwise().sum()/numMeasurementsRecorded_;
             q_var = (qIm2CamBuff_.topRows(numMeasurementsRecorded_).rowwise() - q.transpose()).array().pow(2).colwise().sum()/numMeasurementsRecorded_;
+            
+            // Publish on tf
+            tfbr_.sendTransform(tf::StampedTransform(tf::Transform(tf::Quaternion(q(0),q(1),q(2),q(3)),tf::Vector3(t(0),t(1),t(2))),ros::Time::now(),cameraTF_,"image"));
         }
     }
     
@@ -363,11 +418,10 @@ int main(int argc, char** argv)
 {
     ros::init(argc, argv, "calibrate_node");
     
-    ext_cam_calibrate obj();
+    ext_cam_calibrate obj;
     
     ros::spin();
     
     ROS_INFO("Finished Calibration");
-    ROS_INFO("Calibration parameters written to file: ");
     return 0;
 }
