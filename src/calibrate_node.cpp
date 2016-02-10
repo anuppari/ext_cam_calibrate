@@ -271,13 +271,12 @@ public:
                 if (numSamplesRecorded_ >= sampleBuffSize_)
                 {
                     // Get sample mean
-                    Eigen::Vector3d tIm2Board = tIm2BoardBuff_.colwise().mean();
-                    Eigen::Vector4d temp = (Eigen::MatrixXd) qIm2BoardBuff_.colwise().mean();
-                    Eigen::Quaterniond qIm2Board(temp(0),temp(1),temp(2),temp(3));
+                    tIm2Board = tIm2BoardBuff_.colwise().mean();
+                    qIm2Board = Eigen::Quaterniond((Eigen::Vector4d) qIm2BoardBuff_.colwise().mean());
                     Eigen::Vector3d tBoard = tBoardBuff_.colwise().mean();
-                    Eigen::Quaterniond qBoard = Eigen::Quaterniond(qBoardBuff_.colwise().mean());
+                    Eigen::Quaterniond qBoard((Eigen::Vector4d) qBoardBuff_.colwise().mean());
                     Eigen::Vector3d tCam = tCamBuff_.colwise().mean();
-                    Eigen::Quaterniond qCam = Eigen::Quaterniond(qCamBuff_.colwise().mean());
+                    Eigen::Quaterniond qCam((Eigen::Vector4d) qCamBuff_.colwise().mean());
                     
                     // Calculate image pose w.r.t. world, expressed in world frame. p_world = qIm2World*p_image + tIm2World
                     Eigen::Vector3d tIm2World = tBoard + qBoard*tIm2Board;
