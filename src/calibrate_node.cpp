@@ -344,7 +344,7 @@ public:
     // Draws image with status info
     cv::Mat get_status_image(int type)
     {
-        cv::Mat infoImg(imgHeight_/4,imgWidth_,type);
+        cv::Mat infoImg(300,1920,type);
         infoImg = cv::Scalar(255,255,255); // set background as white
         
         // Current calibration results, and variances
@@ -393,7 +393,12 @@ public:
             cv::putText(infoImg,convert.str(),cv::Point(1100,250),cv::FONT_HERSHEY_SIMPLEX,2.5,cv::Scalar(0,0,255),2);
         }
         
-        return infoImg;
+        // Scale info to image size
+        double scale = ((double) imgWidth_) / ((double) 1920);
+        cv::Mat scaledInfoImage;
+        cv::resize(infoImg,scaledInfoImage,cv::Size(),scale,scale);
+        
+        return scaledInfoImage;
     }
     
     void get_current_calibration_results(Eigen::Vector3d &t,Eigen::Vector4d &q,Eigen::Vector3d &t_var,Eigen::Vector4d &q_var)

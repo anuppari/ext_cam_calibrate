@@ -1,9 +1,9 @@
 <launch>
     <!-- Launch camera driver -->
-    <!-- <include file="$(find ueye_cam)/launch/rgb8.launch" /> -->
+    <include file="$(find ueye_cam)/launch/cam.launch" />
     
     <!-- Launch motion capture driver -->
-    <!-- <include file="$(find mocap_optitrack)/launch/mocap.launch" /> -->
+    <include file="$(find mocap_optitrack)/launch/mocap.launch" />
     
     <!-- Calibration node -->
     <node pkg="ext_cam_calibrate" type="calibrate_node" name="calibrate" output="screen" >
