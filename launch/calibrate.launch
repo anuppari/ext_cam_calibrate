@@ -1,6 +1,12 @@
+<?xml version="1.0"?>
+
 <launch>
+    <arg name="cameraName" default="camera" />
+    <arg name="cameraTF" default="camera" />
+    
     <!-- Launch camera driver -->
-    <include file="$(find ueye_cam)/launch/cam.launch" />
+    <!-- <include file="$(find ueye_cam)/launch/cam.launch" /> -->
+    <include file="$(find bebop_driver)/launch/bebop_node.launch" />
     
     <!-- Launch motion capture driver -->
     <include file="$(find mocap_optitrack)/launch/mocap.launch" />
@@ -14,7 +20,7 @@
         <param name="~sampleBuffSize" value="10" /> <!-- number of samples per measurement. Since timestamp of image and mocap data are not synced, need to sit and wait to make sure data correlates -->
         <param name="~stationaryThreshold" value="1" /> <!-- threshold in pixel motion to consider camera as stationary and can then start taking measurements -->
         <param name="~numMeasurements" value="5" /> <!-- number of measurements to average to get final result -->
-        <param name="~cameraName" value="camera" /> <!-- camera topic -->
-        <param name="~cameraTF" value="camera" /> <!-- tf frame name of camera mocap pose -->
+        <param name="~cameraName" value="$(arg cameraName)" /> <!-- camera topic -->
+        <param name="~cameraTF" value="$(arg cameraTF)" /> <!-- tf frame name of camera mocap pose -->
     </node>
 </launch>
